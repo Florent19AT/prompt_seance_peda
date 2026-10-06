@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scénariser une séance – Générateur de prompt</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef2f4;--card:#fff;--ink:#1c2b36;--mut:#566774;--line:#cfd9df;--acc:#1f5f7a;--accT:#fff;--slate:#1d3a33;--chalk:#f1f5ee;--mark:#f2c230;--warn:#9a5b00}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141b20;--card:#1c262d;--ink:#e6edf1;--mut:#9fb1bc;--line:#32424c;--acc:#6bb7d4;--accT:#0f1a20;--slate:#0f1f1b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Atkinson Hyperlegible",system-ui,Arial,sans-serif}
+header{padding:28px 20px 8px;max-width:1280px;margin:auto}
+h1{margin:0;font-size:1.7rem}
+header p{margin:6px 0 0;color:var(--mut);max-width:70ch}
+main{max-width:1280px;margin:auto;padding:12px 20px 40px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:22px;align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+fieldset{background:var(--card);border:1px solid var(--line);border-radius:10px;margin:0 0 14px;padding:14px 16px 16px}
+legend{font-weight:700;padding:0 6px;font-size:1.05rem}
+label{display:block;margin:10px 0 3px;font-weight:700;font-size:.93rem}
+.hint{font-weight:400;color:var(--mut)}
+input[type=text],input[type=number],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+textarea{min-height:68px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.row{grid-template-columns:1fr}}
+.opts{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:6px}
+.opts label{font-weight:400;margin:0;display:flex;gap:7px;align-items:center}
+.sub{margin:6px 0 0 24px}
+.sub input,.sub select{margin-top:4px}
+.hid{display:none}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+aside{position:sticky;top:12px}
+@media(max-width:900px){aside{position:static}}
+.board{background:var(--slate);color:var(--chalk);border-radius:12px;border:6px solid #8a6b45;padding:16px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.bar select{width:auto;background:#fff1;color:var(--chalk);border-color:#fff4}
+.bar select option{color:#111}
+button{font:inherit;font-weight:700;border-radius:6px;padding:8px 14px;border:1px solid var(--acc);background:var(--acc);color:var(--accT);cursor:pointer}
+button.alt{background:transparent;color:inherit;border-color:currentColor}
+.board button.alt{color:var(--chalk)}
+button.go{background:var(--mark);border-color:var(--mark);color:#222;font-size:1.05rem;padding:10px 18px}
+#out{white-space:pre-wrap;margin:0;font:inherit;font-size:.93rem;line-height:1.55;max-height:62vh;overflow:auto}
+.meta{font-size:.85rem;opacity:.85;margin-top:8px}
+#warn{color:var(--mark)}
+.profile{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;color:var(--mut);font-size:.9rem}
+.profile button{padding:5px 10px;color:var(--ink)}
+.priv{font-size:.85rem;color:var(--warn);margin:8px 0 0}
+</style>
+</head>
+<body>
+<header>
+<h1>Scénariser une séance</h1>
+<p>Remplissez ce que vous savez : le prompt se construit à droite. Le contexte du système éducatif français et les attitudes pédagogiques sont déjà intégrés.</p>
+</header>
+<main>
+<form id="f" onsubmit="return false" autocomplete="off">
+
+<fieldset><legend>Vous enseignez en</legend>
+<label for="struct">Structure</label>
+<select id="struct">
+<option value="">— choisir —</option><option>École maternelle</option><option>École élémentaire</option><option>Collège</option><option>SEGPA</option><option>EREA</option><option>Lycée général et technologique</option><option>Lycée professionnel</option><option>Autre</option>
+</select>
+<div class="opts"><label><input type="checkbox" id="rep"> REP</label><label><input type="checkbox" id="repp"> REP+</label></div>
+<div class="row">
+<div><label for="disc">Discipline</label><input type="text" id="disc" placeholder="ex. Histoire-géographie, polyvalence…"></div>
+<div><label for="niv">Niveau / cycle précis</label><input type="text" id="niv" placeholder="ex. 5e, cycle 3, CAP 1re année"></div>
+</div>
+<div class="profile"><span>Mon profil :</span><button type="button" class="alt" id="psave">Enregistrer</button><button type="button" class="alt" id="pclear">Effacer</button><span id="pmsg"></span></div>
+</fieldset>
+
+<fieldset><legend>Qui</legend>
+<div class="row">
+<div><label for="eff">Nombre d'élèves</label><input type="number" id="eff" min="1" max="40"></div>
+<div><label for="collab">Séance collaborative ?</label>
+<select id="collab"><option value="Non">Non, je suis seul·e</option><option>Co-intervention</option><option>Interdisciplinaire</option><option>Autre</option></select></div>
+</div>
+<div id="collabBox" class="hid"><label for="collabWho">Professeur·e·s de…</label><input type="text" id="collabWho" placeholder="disciplines des collègues"></div>
+</fieldset>
+
+<fieldset><legend>Quoi, pourquoi, quand, où</legend>
+<label for="theme">Thème de la séance</label><input type="text" id="theme">
+<label for="obj">Objectif(s) d'apprentissage</label><textarea id="obj"></textarea>
+<div class="row">
+<div><label for="duree">Durée de la séance</label><input type="text" id="duree" placeholder="ex. 55 min, 2 h"></div>
+<div><label for="cren">Créneau et contexte <span class="hint">(facultatif)</span></label><input type="text" id="cren" placeholder="ex. vendredi 16 h, veille de vacances"></div>
+</div>
+<label for="lieu">Lieu</label><input type="text" id="lieu" placeholder="salle de cours, CDI, salle info, atelier, labo…">
+<label for="seq">Place de la séance dans la séquence</label><input type="text" id="seq" placeholder="ex. séance 2 sur 5, après l'introduction du thème">
+</fieldset>
+
+<fieldset><legend>Vous disposez de</legend>
+<div class="opts">
+<label><input type="checkbox" id="m_pc"> ordinateurs pour les élèves</label>
+<label><input type="checkbox" id="m_vp"> vidéoprojecteur</label>
+<label><input type="checkbox" id="m_en"> enceintes</label>
+<label><input type="checkbox" id="m_net"> accès Internet</label>
+<label><input type="checkbox" id="m_doc"> documents imprimés (manuels, fictions, documentaires, guides…)</label>
+</div>
+<div id="pcBox" class="sub hid"><label for="pcmode" class="hint">Répartition des ordinateurs</label>
+<select id="pcmode"><option>un poste par élève</option><option>un poste pour deux élèves</option><option>quelques postes seulement</option></select></div>
+<div class="opts" style="display:block">
+<label><input type="checkbox" id="m_out"> outils</label><div class="sub hid" id="b_out"><input type="text" id="t_out" placeholder="précisez"></div>
+<label><input type="checkbox" id="m_mat"> matériel</label><div class="sub hid" id="b_mat"><input type="text" id="t_mat" placeholder="précisez"></div>
+<label><input type="checkbox" id="m_aut"> autres</label><div class="sub hid" id="b_aut"><input type="text" id="t_aut" placeholder="précisez"></div>
+</div>
+</fieldset>
+
+<fieldset><legend>Comment</legend>
+<div class="opts">
+<label><input type="radio" name="how" value="desc" checked> Descendant + exercices</label>
+<label><input type="radio" name="how" value="act"> Pédagogies actives</label>
+<label><input type="radio" name="how" value="mix"> Mixtes</label>
+<label><input type="radio" name="how" value="ia"> Laisser l'IA choisir</label>
+</div>
+</fieldset>
+
+<fieldset><legend>Commandes supplémentaires pour l'IA</legend>
+<div class="opts" style="display:block">
+<label><input type="checkbox" id="c_tab" checked> Ajouter un déroulé minuté en tableau</label>
+<label><input type="checkbox" id="c_why"> L'IA explique ses choix</label>
+<label><input type="checkbox" id="c_res"> Idées de types de ressources externes</label>
+</div>
+<label for="part">Particularités de la classe ou souhaits <span class="hint">(facultatif – jamais de noms d'élèves)</span></label>
+<textarea id="part"></textarea>
+</fieldset>
+</form>
+
+<aside>
+<div class="board">
+<div class="bar">
+<select id="mode" aria-label="Longueur du prompt"><option value="complet">Prompt complet</option><option value="court">Prompt court</option></select>
+<button type="button" class="go" id="gen">Générer et copier</button>
+<button type="button" class="alt" id="copy">Copier</button>
+<button type="button" class="alt" id="txt">Export .txt</button>
+</div>
+<pre id="out" aria-live="polite"></pre>
+<div class="meta"><span id="cnt"></span> <span id="warn"></span></div>
+</div>
+</aside>
+</main>
+
+<script>
+const $=i=>document.getElementById(i),v=i=>$(i).value.trim(),ck=i=>$(i).checked;
+const STRUCT={
+"École maternelle":"cycle 1 : activités courtes, manipulation, langage oral, rituels, autonomie en construction",
+"École élémentaire":"cycles 2 et 3 : polyvalence, alternance de temps courts, rythme de l'enfant, entrée dans les écrits",
+"Collège":"collège : grande hétérogénéité des profils et des rythmes, besoin de cadre et de variété",
+"SEGPA":"SEGPA : élèves en difficulté scolaire grave et durable, effectifs réduits (environ 16) ; besoin de concret, de tâches courtes, de réussites rapides, d'étayage de la lecture et de l'écriture",
+"EREA":"EREA : élèves à besoins éducatifs particuliers, souvent avec internat ; accompagnement renforcé, projets concrets, fatigue et rythme à prendre en compte",
+"Lycée général et technologique":"lycée général et technologique : autonomie attendue, exigences de programme, préparation aux évaluations et à l'orientation",
+"Lycée professionnel":"lycée professionnel : élèves parfois en rapport distant à l'école générale ; ancrer dans le métier et les gestes professionnels, contextualiser, articuler atelier et enseignement général",
+"Autre":"contexte spécifique précisé par l'enseignant"};
+const HOW={
+desc:"Approche descendante suivie d'exercices : apport structuré par l'enseignant, puis entraînement progressif, avec vérification et correction.",
+act:"Pédagogies actives : l'élève est en activité, l'enseignant tutore.",
+mix:"Approche mixte : alterner temps d'apport structuré et temps d'activité des élèves.",
+ia:"Choisis toi-même l'approche la plus pertinente selon le contexte, et justifie-la en une phrase."};
+const ACTIVE="Dans une configuration de classe flexible ou en pédagogie active, prévois les documents de cadrage et de suivi nécessaires (fiche de route, consignes, grille d'auto-évaluation…). Le rôle de l'enseignant est de contrôler, tuteurer, accompagner, vérifier, corriger et remédier : réserve des plages explicites pour cela, sans réduire la place majeure de l'activité des élèves.";
+
+function build(){
+ const full=$('mode').value==='complet',L=[],miss=[];
+ const g=(id,lab)=>{const x=v(id);if(!x){miss.push(lab);return "[à préciser]"}return x};
+ const s=v('struct'),n=parseInt(v('eff'))||0,how=document.querySelector('input[name=how]:checked').value;
+ const p=t=>L.push(t);
+ p("Tu es un·e conseiller·ère pédagogique expert·e du système éducatif français. Aide-moi à scénariser une séance. Réponds en français, avec un ton bienveillant, concret et sans jargon inutile.");
+ p("");
+ p("CONTEXTE");
+ if(!s)miss.push("structure");
+ let ctx="Structure : "+(s||"[à préciser]");
+ if(ck('rep'))ctx+=" – éducation prioritaire REP";
+ if(ck('repp'))ctx+=" – éducation prioritaire REP+";
+ p(ctx+".");
+ if(full&&s)p("Points d'attention : "+STRUCT[s]+".");
+ if(full&&(ck('rep')||ck('repp')))p("En éducation prioritaire, des fragilités possibles (langage, confiance scolaire, ressources hors de l'école) : privilégie l'explicitation, l'étayage et le travail réalisé en classe plutôt qu'à la maison. Évite tout stéréotype sur les élèves.");
+ p("Discipline : "+g('disc','discipline')+" | Niveau/cycle : "+g('niv','niveau'));
+ if(!n)miss.push("effectif");
+ let e="Effectif : "+(n||"[à préciser]")+" élèves";
+ if(n){
+  if(n<=15)e+=" (effectif réduit : favorise suivi individuel et oral).";
+  else if(n<=24)e+=" (effectif moyen : au-delà de 15 élèves la gestion se complexifie ; prévois routines et groupes de 3 à 4).";
+  else e+=" (effectif élevé : attention et motivation plus difficiles à maintenir).";
+ }
+ p(e);
+ if(full&&n>15)p("Propose des idées pour favoriser l'attention et la motivation, et prévois des modalités de gestion de classe, de mise au travail et de maintien de l'attention.");
+ const co=v('collab');
+ p(co==="Non"?"Séance menée par un·e seul·e enseignant·e.":"Séance collaborative ("+co+") avec des professeur·e·s de : "+(v('collabWho')||"[à préciser]")+". Répartis clairement les rôles de chaque enseignant·e dans le déroulé.");
+ p("");
+ p("SÉANCE");
+ p("Thème : "+g('theme','thème'));
+ p("Objectif(s) d'apprentissage : "+g('obj','objectifs'));
+ p("Durée : "+g('duree','durée')+(v('cren')?" | Créneau : "+v('cren'):""));
+ p("Lieu : "+g('lieu','lieu'));
+ if(v('seq'))p("Place dans la séquence : "+v('seq'));
+ p("");
+ p("MATÉRIEL");
+ const yes=[],no=[];
+ const add=(id,lab)=>(ck(id)?yes:no).push(lab);
+ add('m_vp',"vidéoprojecteur");add('m_en',"enceintes");add('m_net',"accès Internet");add('m_doc',"documents imprimés");
+ if(ck('m_pc'))yes.push("ordinateurs pour les élèves ("+v('pcmode')+")");else no.push("ordinateurs pour les élèves");
+ [['m_out','t_out','outils'],['m_mat','t_mat','matériel'],['m_aut','t_aut','autres']].forEach(([c,t,l])=>{if(ck(c))yes.push(l+" : "+(v(t)||"non précisé"))});
+ p("Disponible : "+(yes.join(", ")||"rien de particulier")+".");
+ if(no.length)p("NON disponible : "+no.join(", ")+". Ne propose rien qui en dépende (par exemple aucune vidéo sans vidéoprojecteur, aucun son sans enceintes).");
+ const fixe=/labo|atelier/i.test(v('lieu'));
+ p(fixe?"Le mobilier est probablement fixe (laboratoire ou atelier) : adapte l'organisation spatiale.":"Pars du principe que les tables sont déplaçables (U, rectangle, ovale, îlots, autobus) : propose l'agencement le plus adapté.");
+ p("");
+ p("DÉMARCHE");
+ p(HOW[how]);
+ if(full||how!=="desc")if(how!=="desc")p(ACTIVE);
+ if(how==="ia"&&full)p(ACTIVE);
+ p("Inclusion : la classe est hétérogène et tout élève peut avoir des besoins spécifiques. Pour chaque activité, propose une version de base, un soutien et un approfondissement, de manière inclusive, afin de personnaliser les apprentissages.");
+ p("Mémorisation : appuie-toi sur les processus favorisant la mémoire à long terme. Fournis un court test de récupération à utiliser en début de séance suivante ; il sera remis aux élèves à la fin de cette séance pour que ceux qui le souhaitent puissent s'entraîner chez eux. Rédige-le en entier, prêt à être copié-collé puis imprimé : d'abord la feuille élève (titre, nom et date à compléter, questions, espace de réponse), puis, séparé, le corrigé pour l'enseignant.");
+ p("");
+ p("FORMAT DE RÉPONSE");
+ p("Présente la séance étape par étape, dans l'ordre chronologique. Pour chaque étape, précise l'activité (consigne, rôle de l'enseignant, rôle des élèves, durée) et explicite les liens avec l'étape précédente, la suivante et les objectifs.");
+ p("Intègre directement dans l'étape concernée, et nulle part ailleurs : (1) les variantes éventuelles, pour que je puisse me projeter immédiatement à ce moment de la séance ; (2) les conseils de gestion de classe, d'attention, d'inclusion ou de mémorisation et tout rappel théorique utile, en une ou deux phrases. Ne crée aucune rubrique finale de variantes, de conseils ou de théorie.");
+ p("Quand tu proposes une activité, rédige-la à l'endroit concerné sous la forme la plus adaptée (texte rédigé ou tableau), prête à être copiée-collée puis imprimée : consignes, énoncés, supports et grilles complets, sans commentaire intercalé ni renvoi vers un autre passage.");
+ if(ck('c_tab'))p("Ajoute un déroulé minuté sous forme de tableau : durée, phase, activité de l'enseignant, activité des élèves, modalité, matériel, différenciation. Place les variantes dans la ligne de l'étape concernée.");
+ if(ck('c_why'))p("Explique brièvement tes choix pédagogiques, dans l'étape concernée.");
+ if(ck('c_res'))p("Suggère des types de ressources externes (sans références précises), par exemple : partir d'un extrait de livre ou de vidéo traitant de telle notion. Elles doivent correspondre au matériel disponible.");
+ if(v('part')){p("");p("PARTICULARITÉS : "+v('part'))}
+ p("");
+ p("Règles : n'invente ni ne cite de textes officiels ou de références précises ; si un point dépend des programmes, invite-moi à vérifier. Je garde ma liberté pédagogique : propose, je décide.");
+ return{text:L.join("\n"),miss};
+}
+let last="";
+function refresh(){
+ const r=build();last=r.text;$('out').textContent=r.text;
+ $('cnt').textContent=r.text.length+" caractères";
+ $('warn').textContent=r.miss.length?" – à compléter : "+[...new Set(r.miss)].join(", "):"";
+ $('collabBox').classList.toggle('hid',v('collab')==="Non");
+ $('pcBox').classList.toggle('hid',!ck('m_pc'));
+ [['m_out','b_out'],['m_mat','b_mat'],['m_aut','b_aut']].forEach(([c,b])=>$(b).classList.toggle('hid',!ck(c)));
+}
+async function copy(){
+ try{await navigator.clipboard.writeText(last)}catch(e){const r=document.createRange();r.selectNodeContents($('out'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}
+ const w=$('cnt');const o=w.textContent;w.textContent="Copié ✔";setTimeout(()=>w.textContent=o,1600);
+}
+$('f').addEventListener('input',refresh);$('f').addEventListener('change',refresh);$('mode').addEventListener('change',refresh);
+$('gen').onclick=()=>{refresh();copy();$('out').scrollTop=0};
+$('copy').onclick=copy;
+$('txt').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([last],{type:'text/plain;charset=utf-8'}));a.download='prompt-seance.txt';a.click();URL.revokeObjectURL(a.href)};
+const PK='profil-seance',PF=['struct','disc','niv'];
+function pmsg(t){$('pmsg').textContent=t;setTimeout(()=>$('pmsg').textContent='',2200)}
+$('psave').onclick=()=>{try{localStorage.setItem(PK,JSON.stringify({...Object.fromEntries(PF.map(i=>[i,v(i)])),rep:ck('rep'),repp:ck('repp')}));pmsg("Profil enregistré")}catch(e){pmsg("Enregistrement impossible")}};
+$('pclear').onclick=()=>{try{localStorage.removeItem(PK)}catch(e){}pmsg("Profil effacé")};
+try{const d=JSON.parse(localStorage.getItem(PK)||'null');if(d){PF.forEach(i=>$(i).value=d[i]||'');$('rep').checked=!!d.rep;$('repp').checked=!!d.repp}}catch(e){}
+refresh();
+</script>
+</body>
+</html>
